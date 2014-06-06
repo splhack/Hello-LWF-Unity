@@ -1,0 +1,13 @@
+if not LWF then LWF={} end
+if not LWF.Script then LWF.Script={} end
+if not LWF.Script.cat then LWF.Script.cat={} end
+local _root
+
+LWF.Script.cat._root_load = function(self)
+	_root = self
+	
+end
+
+LWF.Script.cat.chara_0_buttonSymbol_x0_y_30_press = function(self)
+		self:gotoAndPlay("jump")
+end
