@@ -42,3 +42,18 @@ Load Lua script and pass luaState to luaState argument of LWFObject.Load method.
     L = new Lua();
     L.DoString(script.text);
     Load(lwfPath, luaState:L.luaState);
+
+You can also write Lua script in Flash actionscript panel like [LWF for HTML5 Embedded JavaScript](https://github.com/gree/lwf/wiki/Blog-%231).
+
+For instance,
+
+    /* lua
+        self:gotoAndPlay("run")
+    */
+
+
+    on (press) { /* lua
+        self.cat:gotoAndPlay("jump")
+    */ }
+
+TBU
