@@ -34,6 +34,8 @@ Lua scripting
 
 This project also enables Lua scripting of LWF with [KopiLua](http://gfootweb.webspace.virginmedia.com/KLI-bin/).
 
+Define LWF_USE_LUA in [Assets/smcs.rsp](https://github.com/splhack/Hello-LWF-Unity/blob/master/Assets/smcs.rsp).
+
 Load Lua script and pass luaState to luaState argument of LWFObject.Load method.
 
     var script = Resources.Load(Lua_script_filename) as TextAsset;
