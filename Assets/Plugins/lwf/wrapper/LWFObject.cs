@@ -33,6 +33,7 @@ using LWFCallback = System.Action<LWFObject>;
 using LWFCallbacks = System.Collections.Generic.List<System.Action<LWFObject>>;
 
 using EventHandler = System.Action<LWF.Movie, LWF.Button>;
+using EventResultHandler = System.Action<int>;
 using MovieEventHandler = System.Action<LWF.Movie>;
 using ButtonEventHandler = System.Action<LWF.Button>;
 using ButtonKeyPressHandler = System.Action<LWF.Button, int>;
@@ -48,6 +49,11 @@ using RendererFactoryConstructor =
 using UnityEditor;
 #endif
 
+class HandlerWrapper
+{
+	public int id;
+}
+
 public class RendererFactoryArguments
 {
 	public LWF.Data data;
@@ -56,15 +62,17 @@ public class RendererFactoryArguments
 	public float zRate;
 	public int renderQueueOffset;
 	public bool useAdditionalColor;
-	public Camera camera;
+	public Camera renderCamera;
+	public Camera inputCamera;
 	public string texturePrefix;
 	public string fontPrefix;
 	public TextureLoader textureLoader;
 	public TextureUnloader textureUnloader;
 
 	public RendererFactoryArguments(LWF.Data d, GameObject gObj, float zOff,
-		float zR, int rQOff, bool uAC, Camera cam, string texturePrfx,
-		string fontPrfx, TextureLoader textureLdr, TextureUnloader textureUnldr)
+		float zR, int rQOff, bool uAC, Camera renderCam, Camera inputCam,
+		string texturePrfx, string fontPrfx, TextureLoader textureLdr,
+		TextureUnloader textureUnldr)
 	{
 		data = d;
 		gameObject = gObj;
@@ -72,7 +80,8 @@ public class RendererFactoryArguments
 		zRate = zR;
 		renderQueueOffset = rQOff;
 		useAdditionalColor = uAC;
-		camera = cam;
+		renderCamera = renderCam;
+		inputCamera = inputCam;
 		texturePrefix = texturePrfx;
 		fontPrefix = fontPrfx;
 		textureLoader = textureLdr;
@@ -148,8 +157,8 @@ public class LWFObject : MonoBehaviour
 	public virtual bool Load(string path,
 		string texturePrefix = "", string fontPrefix = "",
 		float zOffset = 0, float zRate = 1, int renderQueueOffset = 0,
-		Camera camera = null, bool autoUpdate = true,
-		bool useAdditionalColor = false,
+		Camera renderCamera = null, Camera inputCamera = null,
+		bool autoUpdate = true, bool useAdditionalColor = false,
 		LWFDataCallback lwfDataCallback = null,
 		LWFCallback lwfLoadCallback = null,
 		LWFCallback lwfDestroyCallback = null,
@@ -163,8 +172,8 @@ public class LWFObject : MonoBehaviour
 	{
 		lwfName = path;
 		callUpdate = autoUpdate;
-		if (camera == null)
-			camera = Camera.main;
+		if (inputCamera == null)
+			inputCamera = Camera.main;
 
 		if (lwfLoadCallback != null)
 			lwfLoadCallbacks.Add(lwfLoadCallback);
@@ -182,19 +191,19 @@ public class LWFObject : MonoBehaviour
 		if (rendererFactoryConstructor != null) {
 			RendererFactoryArguments arg = new RendererFactoryArguments(
 				data, gameObject, zOffset, zRate, renderQueueOffset,
-				useAdditionalColor, camera, texturePrefix, fontPrefix,
-				textureLoader, textureUnloader);
+				useAdditionalColor, renderCamera, inputCamera, texturePrefix,
+				fontPrefix, textureLoader, textureUnloader);
 			factory = rendererFactoryConstructor(arg);
 		} else if (useCombinedMeshRenderer && data.textures.Length == 1) {
 			factory = new LWF.CombinedMeshRenderer.Factory(
 				data, gameObject, zOffset, zRate, renderQueueOffset,
-				useAdditionalColor, camera, texturePrefix, fontPrefix,
-				textureLoader, textureUnloader);
+				useAdditionalColor, renderCamera, inputCamera, texturePrefix,
+				fontPrefix, textureLoader, textureUnloader);
 		} else {
 			factory = new LWF.DrawMeshRenderer.Factory(
 				data, gameObject, zOffset, zRate, renderQueueOffset,
-				useAdditionalColor, camera, texturePrefix, fontPrefix,
-				textureLoader, textureUnloader);
+				useAdditionalColor, renderCamera, inputCamera, texturePrefix,
+				fontPrefix, textureLoader, textureUnloader);
 		}
 
 #if LWF_USE_LUA
@@ -295,13 +304,14 @@ public class LWFObject : MonoBehaviour
 		bool press = false;
 		bool release = false;
 
-		if (lwf.interactive) {
+		if (lwf.interactive && factory.inputCamera != null) {
 			bool down = Input.GetButton("Fire1");
 			press = Input.GetButtonDown("Fire1");
 			release = Input.GetButtonUp("Fire1");
 			if (down) {
 				Vector3 screenPos = Input.mousePosition;
-				Vector3 worldPos = factory.camera.ScreenToWorldPoint(screenPos);
+				Vector3 worldPos =
+					factory.inputCamera.ScreenToWorldPoint(screenPos);
 				Matrix4x4 matrix = gameObject.transform.worldToLocalMatrix;
 				Vector3 pos = matrix.MultiplyPoint(worldPos);
 				pointX = (int)pos.x;
@@ -345,7 +355,7 @@ public class LWFObject : MonoBehaviour
 
 	public Vector3 ScreenToLWFPoint(Vector3 screenPoint)
 	{
-		Camera camera = factory.camera;
+		Camera camera = factory.inputCamera;
 		Vector3 worldPoint = camera.ScreenToWorldPoint(screenPoint);
 		return WorldToLWFPoint(worldPoint);
 	}
@@ -468,15 +478,19 @@ public class LWFObject : MonoBehaviour
 		cache.SetLoader(dataLoader, textureLoader, textureUnloader);
 	}
 
-	public void AddEventHandler(string eventName, EventHandler eventHandler)
+	public void AddEventHandler(string eventName,
+		EventHandler eventHandler, EventResultHandler resultHandler = null)
 	{
-		AddLoadCallback((o) => {lwf.AddEventHandler(eventName, eventHandler);});
+		AddLoadCallback((o) => {
+			int id = lwf.AddEventHandler(eventName, eventHandler);
+			if (resultHandler != null)
+				resultHandler(id);
+		});
 	}
 
-	public void RemoveEventHandler(string eventName, EventHandler eventHandler)
+	public void RemoveEventHandler(string eventName, int id)
 	{
-		AddLoadCallback(
-			(o) => {lwf.RemoveEventHandler(eventName, eventHandler);});
+		AddLoadCallback((o) => {lwf.RemoveEventHandler(eventName, id);});
 	}
 
 	public void ClearEventHandler(string eventName)
@@ -484,9 +498,14 @@ public class LWFObject : MonoBehaviour
 		AddLoadCallback((o) => {lwf.ClearEventHandler(eventName);});
 	}
 
-	public void SetEventHandler(string eventName, EventHandler eventHandler)
+	public void SetEventHandler(string eventName,
+		EventHandler eventHandler, EventResultHandler resultHandler = null)
 	{
-		AddLoadCallback((o) => {lwf.SetEventHandler(eventName, eventHandler);});
+		AddLoadCallback((o) => {
+			int id = lwf.SetEventHandler(eventName, eventHandler);
+			if (resultHandler != null)
+				resultHandler(id);
+		});
 	}
 
 	public void SetProgramObjectConstructor(string programObjectName,
@@ -499,19 +518,21 @@ public class LWFObject : MonoBehaviour
 	public void AddMovieEventHandler(string instanceName,
 		MovieEventHandler load = null, MovieEventHandler postLoad = null,
 		MovieEventHandler unload = null, MovieEventHandler enterFrame = null,
-		MovieEventHandler update = null, MovieEventHandler render = null)
+		MovieEventHandler update = null, MovieEventHandler render = null,
+		EventResultHandler resultHandler = null)
 	{
-		AddLoadCallback((o) => {lwf.AddMovieEventHandler(instanceName,
-			load, postLoad, unload, enterFrame, update, render);});
+		AddLoadCallback((o) => {
+			int id = lwf.AddMovieEventHandler(instanceName,
+				load, postLoad, unload, enterFrame, update, render);
+			if (resultHandler != null)
+				resultHandler(id);
+		});
 	}
 
-	public void RemoveMovieEventHandler(string instanceName,
-		MovieEventHandler load = null, MovieEventHandler postLoad = null,
-		MovieEventHandler unload = null, MovieEventHandler enterFrame = null,
-		MovieEventHandler update = null, MovieEventHandler render = null)
+	public void RemoveMovieEventHandler(string instanceName, int id)
 	{
-		AddLoadCallback((o) => {lwf.RemoveMovieEventHandler(instanceName,
-			load, postLoad, unload, enterFrame, update, render);});
+		AddLoadCallback((o) =>
+			{lwf.RemoveMovieEventHandler(instanceName, id);});
 	}
 
 	public void ClearMovieEventHandler(string instanceName)
@@ -529,10 +550,15 @@ public class LWFObject : MonoBehaviour
 	public void SetMovieEventHandler(string instanceName,
 		MovieEventHandler load = null, MovieEventHandler postLoad = null,
 		MovieEventHandler unload = null, MovieEventHandler enterFrame = null,
-		MovieEventHandler update = null, MovieEventHandler render = null)
+		MovieEventHandler update = null, MovieEventHandler render = null,
+		EventResultHandler resultHandler = null)
 	{
-		AddLoadCallback((o) => {lwf.SetMovieEventHandler(instanceName,
-			load, postLoad, unload, enterFrame, update, render);});
+		AddLoadCallback((o) => {
+			int id = lwf.SetMovieEventHandler(instanceName,
+				load, postLoad, unload, enterFrame, update, render);
+			if (resultHandler != null)
+				resultHandler(id);
+		});
 	}
 
 	public void AddButtonEventHandler(string instanceName,
@@ -541,24 +567,22 @@ public class LWFObject : MonoBehaviour
 		ButtonEventHandler render = null, ButtonEventHandler press = null,
 		ButtonEventHandler release = null, ButtonEventHandler rollOver = null,
 		ButtonEventHandler rollOut = null,
-		ButtonKeyPressHandler keyPress = null)
+		ButtonKeyPressHandler keyPress = null,
+		EventResultHandler resultHandler = null)
 	{
-		AddLoadCallback((o) => {lwf.AddButtonEventHandler(
-			instanceName, load, unload, enterFrame, update, render,
-				press, release, rollOver, rollOut, keyPress);});
+		AddLoadCallback((o) => {
+			int id = lwf.AddButtonEventHandler(
+				instanceName, load, unload, enterFrame, update, render,
+					press, release, rollOver, rollOut, keyPress);
+			if (resultHandler != null)
+				resultHandler(id);
+		});
 	}
 
-	public void RemoveButtonEventHandler(string instanceName,
-		ButtonEventHandler load = null, ButtonEventHandler unload = null,
-		ButtonEventHandler enterFrame = null, ButtonEventHandler update = null,
-		ButtonEventHandler render = null, ButtonEventHandler press = null,
-		ButtonEventHandler release = null, ButtonEventHandler rollOver = null,
-		ButtonEventHandler rollOut = null,
-		ButtonKeyPressHandler keyPress = null)
+	public void RemoveButtonEventHandler(string instanceName, int id)
 	{
-		AddLoadCallback((o) => {lwf.RemoveButtonEventHandler(
-			instanceName, load, unload, enterFrame, update, render,
-				press, release, rollOver, rollOut, keyPress);});
+		AddLoadCallback((o) =>
+			{lwf.RemoveButtonEventHandler(instanceName, id);});
 	}
 
 	public void ClearButtonEventHandler(string instanceName)
@@ -579,11 +603,16 @@ public class LWFObject : MonoBehaviour
 		ButtonEventHandler render = null, ButtonEventHandler press = null,
 		ButtonEventHandler release = null, ButtonEventHandler rollOver = null,
 		ButtonEventHandler rollOut = null,
-		ButtonKeyPressHandler keyPress = null)
+		ButtonKeyPressHandler keyPress = null,
+		EventResultHandler resultHandler = null)
 	{
-		AddLoadCallback((o) => {lwf.SetButtonEventHandler(
-			instanceName, load, unload, enterFrame, update, render,
-				press, release, rollOver, rollOut, keyPress);});
+		AddLoadCallback((o) => {
+			int id = lwf.SetButtonEventHandler(
+				instanceName, load, unload, enterFrame, update, render,
+					press, release, rollOver, rollOut, keyPress);
+			if (resultHandler != null)
+				resultHandler(id);
+		});
 	}
 
 	public void Init()
@@ -650,9 +679,10 @@ public class LWFObject : MonoBehaviour
 		string instanceName, MovieEventHandler handler, bool immortal = false)
 	{
 		AddLoadCallback((o) => {
+			HandlerWrapper w = new HandlerWrapper();
 			MovieEventHandler h = (m) => {
 				if (!immortal)
-					lwf.RemoveMovieEventHandler(instanceName, load:h);
+					lwf.RemoveMovieEventHandler(instanceName, w.id);
 				handler(m);
 			};
 
@@ -660,9 +690,9 @@ public class LWFObject : MonoBehaviour
 			if (movie != null) {
 				handler(movie);
 				if (immortal)
-					lwf.AddMovieEventHandler(instanceName, load:h);
+					w.id = lwf.AddMovieEventHandler(instanceName, load:h);
 			} else {
-				lwf.AddMovieEventHandler(instanceName, load:h);
+				w.id = lwf.AddMovieEventHandler(instanceName, load:h);
 			}
 		});
 	}
