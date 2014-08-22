@@ -39,7 +39,7 @@ public class ProgramObjectTest : LWFObject
 {
 	void Start()
 	{
-		Load("ProgramObjectTest/ProgramObjectTest", "ProgramObjectTest/");
+		Load("ProgramObjectTest/ProgramObjectTest");
 		FitForHeight((int)Camera.main.orthographicSize * 2);
 
 		SetProgramObjectConstructor(

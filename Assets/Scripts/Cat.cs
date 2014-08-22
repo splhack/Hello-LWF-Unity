@@ -14,7 +14,7 @@ public class Cat : LWFObject
 		var script = Resources.Load("cat/cat_script") as TextAsset;
 		L = new Lua();
 		L.DoString(script.text);
-		Load("cat/cat", "cat/",
+		Load("cat/cat",
 			sortingLayerName:sortingLayer, sortingOrder:sortingOrder,
 			luaState:L.luaState);
 		ScaleForHeight((int)Camera.main.orthographicSize * 2);

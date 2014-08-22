@@ -10,9 +10,7 @@ public class SimpleLWF : LWFObject
 
 	void Start()
 	{
-		string texPath = Path.GetDirectoryName(lwfPath) + "/";
-		Load(lwfPath, texPath,
-			sortingLayerName:sortingLayer, sortingOrder:sortingOrder);
+		Load(lwfPath, sortingLayerName:sortingLayer, sortingOrder:sortingOrder);
 		ScaleForHeight((int)Camera.main.orthographicSize * 2);
 	}
 }
