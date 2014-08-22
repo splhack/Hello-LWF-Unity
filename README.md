@@ -24,11 +24,6 @@ Please take a look at [LWF Presentation](http://gree.github.io/lwf/presentation2
 
 Install LWFS https://github.com/gree/lwfs to convert Adobe Flash data into LWF data. It automatically converts in ~/Desktop/LWFS_work folder and shows the data on Web browser.
 
-Bitmap font
------------
-
-This project uses [Bitmap font](https://github.com/splhack/Hello-LWF-Unity/tree/master/Assets/Resources/BitmapFont). Please refer [the document](https://github.com/gree/unity-bitmapfontrenderer/tree/master/sample/Assets/Resources/BitmapFont) to generate your own Bitmap font. You may need to [set Bitmap font loader](https://github.com/splhack/Hello-LWF-Unity/blob/5db71c9e5a4e29f731a028d429f7219f8bb5142f/Assets/Scripts/Main.cs#L8-L15) ahead of using LWF.
-
 Lua scripting
 -------------
 
