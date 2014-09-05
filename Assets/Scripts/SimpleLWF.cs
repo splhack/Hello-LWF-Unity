@@ -5,12 +5,10 @@ using System.IO;
 public class SimpleLWF : LWFObject
 {
 	public string lwfPath;
-	public string sortingLayer;
-	public int sortingOrder;
 
 	void Start()
 	{
-		Load(lwfPath, sortingLayerName:sortingLayer, sortingOrder:sortingOrder);
+		Load(lwfPath);
 		ScaleForHeight((int)Camera.main.orthographicSize * 2);
 	}
 }
